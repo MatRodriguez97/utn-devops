@@ -6,35 +6,40 @@ Vagrant.configure("2") do |config|
   config.vm.network "forwarded_port", guest: 80, host: 8080
   config.vm.hostname = "utn-devops.localhost"
 
+  # Redirecciono puertos desde la maquina virtual a la maquina real. Por ejemplo.
+  config.vm.network "forwarded_port", guest: 8082, host: 8082, auto_correct: true
+  # Puerto en que escuchar el servidor maestro de Puppet
+  config.vm.network "forwarded_port", guest: 8140, host: 8140, auto_correct: true
+  
+  
+  #Permite descargas con certificados vencidos o por http
+  config.vm.box_download_insecure = true
+  
+  # configuración del nombre de maquina
+  config.vm.hostname = "utn-devops.localhost"
+  config.vm.boot_timeout = 3600
+  
+  #descripcion de la VM
   config.vm.provider "virtualbox" do |v|
-	  v.name = "DevOps"
+	  v.name = "DevOps-puppet"
     v.memory = "1024"
   end
   
-  config.vm.provision "shell", inline: <<-SHELL
-    apt-get update
-    #apt-get install -y apache2
-    #sudo chmod 775 /var/www/html
-    #sudo chown -R vagrant:vagrant /var/www/html
-    #sudo cp /vagrant/index.html /var/www/html/index.html 
+  # Mapeo de directorios que se comparten entre la maquina virtual y nuestro equipo. En este caso es
+  # el propio directorio donde está el archivo  y el directorio "/vagrant" dentro de la maquina virtual.
+  config.vm.synced_folder ".", "/vagrant"
 
-    #Instalamos los paquetes de docker
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-    sudo chmod a+r /usr/share/keyrings/docker-archive-keyring.gpg
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+  config.vm.provision "file", source: "hostConfigs/ufw", destination: "/tmp/utw"
+  config.vm.provision "file", source: "hostConfigs/etc_hosts.txt", destination: "/tmp/etc_hosts.txt"
+  # Archivos de Puppet
+  config.vm.provision "file", source: "hostConfigs/puppet/site.pp", destination: "/tmp/site.pp"
+  config.vm.provision "file", source: "hostConfigs/puppet/init.pp", destination: "/tmp/init.pp"
+  config.vm.provision "file", source: "hostConfigs/puppet/init_jenkins.pp", destination: "/tmp/init_jenkins.pp"
+  config.vm.provision "file", source: "hostConfigs/puppet/puppet-master.conf", destination: "/tmp/puppet-master.conf"
+  config.vm.provision "file", source: "hostConfigs/puppet/.env", destination: "/tmp/env"
+  # En este archivo tendremos el provisionamiento de software necesario para nuestra
+  # maquina virtual. Por ejemplo, servidor web, servidor de base de datos, etc.
+  config.vm.provision :shell, path: "Vagrant.bootstrap.sh", run: "always"
 
-    #Actualizo los paquetes con los nuevos repositorios
-    sudo apt-cache policy docker-ce
-    sudo apt-get update -y
-    #Instalo docker desde el repositorio oficial
-    sudo apt-get -y  install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-compose
-
-    #Lo configuro para que inicie en el arranque
-    sudo systemctl enable docker
-
-    #Entramos a la carpeta raiz del compose y levantamos el mismo
-    cd /vagrant && sudo docker compose up -d
-
-  SHELL
 end
   
